@@ -1,9 +1,12 @@
 # -----------------------------------------------------
 # Person Search Dataset for Both Training and Testing
 #
-# Author: Liangqi Li
-# Creating Date: Mar 28, 2018
-# Latest rectified: Nov 5, 2018
+# Created By: Liangqi Li
+# Created Date: Mar 28, 2018
+# -----------------------------------------------------
+# -----------------------------------------------------
+# Last Modified By: Bicheng Hu
+# Last Modified Date: Mar 6, 2019
 # -----------------------------------------------------
 import os
 import os.path as osp
@@ -14,6 +17,7 @@ import pandas as pd
 import cv2
 import numpy as np
 import pickle
+import yaml
 import torch
 from torch.utils.data import Dataset
 from torch.utils.data.sampler import Sampler
@@ -40,6 +44,28 @@ def sipn_fn(batch):
 
     return im_tensors, gt_boxes, im_info
 
+
+def pre_process_image(im_path, copy=False):
+
+    with open('config.yml', 'r') as cfg:
+        config = yaml.load(cfg)
+
+    im_orig = cv2.imread(im_path).astype(np.float32)
+    im_orig -= config['pixel_means']
+
+    im_shape = im_orig.shape
+    im_size_min = np.min(im_shape[0:2])
+    im_size_max = np.max(im_shape[0:2])
+
+    im_scale = float(config['target_size']) / float(im_size_min)
+    # Prevent the biggest axis from being more than MAX_SIZE
+    if np.round(im_scale * im_size_max) > config['max_size']:
+        im_scale = float(config['max_size']) / float(im_size_max)
+    im_processed = cv2.resize(im_orig, None, None, fx=im_scale, fy=im_scale,
+                    interpolation=cv2.INTER_LINEAR)
+    im_processed = np.expand_dims(im_processed, axis=0)
+
+    return im_processed, im_scale, im_shape
 
 class SIPNQueryDataset(Dataset):
 
