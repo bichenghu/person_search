@@ -14,7 +14,8 @@ import numpy.random as npr
 from utils.generate_anchors import generate_anchors
 from utils.losses import smooth_l1_loss
 from utils.bbox_transform import *
-from nms.pth_nms import pth_nms as nms
+#from nms.pth_nms import pth_nms as nms
+from models.roi_layer.nms import nms
 
 
 def spatial_transform(bottom, trans_param):
@@ -235,16 +236,21 @@ class STRPN(nn.Module):
         proposals = bbox_transform_inv(self.anchors, rpn_bbox_pred)
         proposals = clip_boxes(proposals, im_info[:2])
 
+        #proposals = proposals.unsqueeze(0)
+
         # Pick the top region proposals
-        scores, order = scores.view(-1).sort(descending=True)
+        #scores, order = scores.view(-1).sort(descending=True)
+        scores, order = torch.sort(scores.view(-1), 0, True)
         if pre_nms_top_n > 0:
             order = order[:pre_nms_top_n]
-            scores = scores[:pre_nms_top_n].view(-1, 1)
+            scores = scores[:pre_nms_top_n].view(-1)
+        #proposals = proposals[order.data, :]
         proposals = proposals[order.data, :]
         trans_param = rpn_trans_param[order.data, :]
 
         # Non-maximal suppression
-        keep = nms(torch.cat((proposals, scores), 1).data, nms_thresh)
+        #keep = nms(torch.cat((proposals, scores), 1).data, nms_thresh)
+        keep = nms(proposals, scores, nms_thresh)
 
         # Pick th top region proposals after NMS
         if post_nms_top_n > 0:

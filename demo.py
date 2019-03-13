@@ -1,9 +1,12 @@
 # -----------------------------------------------------
 # Demo Spatial Invariant Person Search Network
 #
-# Author: Liangqi Li
-# Creating Date: Apr 26, 2018
-# Latest rectified: Oct 25, 2018
+# Created By: Liangqi Li
+# Created Date: Apr 26, 2018
+# -----------------------------------------------------
+# -----------------------------------------------------
+# Latest Modified By: Bicheng Hu
+# Latest Modified Date: Mar 6, 2019
 # -----------------------------------------------------
 import os
 import argparse
@@ -15,21 +18,21 @@ import matplotlib.pyplot as plt
 
 from utils.utils import clock_non_return
 from dataset.sipn_dataset import pre_process_image
-from models.model import SIPN
+from models.sipn.model import SIPN
 from utils.bbox_transform import bbox_transform_inv
-from nms.pth_nms import pth_nms as nms
-
+#from nms.pth_nms import pth_nms as nms
+from models.roi_layer.nms import nms
 
 def parse_args():
     """Parse input arguments"""
 
     parser = argparse.ArgumentParser(description='Testing')
     parser.add_argument('--net', default='res50', type=str)
-    parser.add_argument('--trained_epochs', default='10', type=str)
+    parser.add_argument('--trained_epochs', default='19', type=str)
     parser.add_argument('--gpu_ids', default='0', type=str)
-    parser.add_argument('--data_dir', default='./demo', type=str)
+    parser.add_argument('--data_dir', default='./demo/images', type=str)
     parser.add_argument('--model_dir', default='./output', type=str)
-    parser.add_argument('--dataset_name', default='sysu', type=str)
+    parser.add_argument('--dataset_name', default='prw', type=str)
 
     args = parser.parse_args()
 
@@ -75,20 +78,25 @@ def demo_detection(net, im_dir, images, use_cuda, thresh=.75):
     with torch.no_grad():
         for im_name in images:
             im_path = os.path.join(im_dir, im_name)
-            im, im_scale, orig_shape = pre_process_image(im_path, copy=True)
-            im_info = np.array([im.shape[1], im.shape[2], im_scale],
+            im_data, im_scale, orig_shape = pre_process_image(im_path, copy=True)
+            im_info = np.array([im_data.shape[1], im_data.shape[2], im_scale],
                                dtype=np.float32)
 
-            im = im.transpose([0, 3, 1, 2])
+            im_data = im_data.transpose([0, 3, 1, 2])
 
             if use_cuda:
-                im = torch.from_numpy(im).cuda()
+                im_data = torch.from_numpy(im_data).float().cuda()
+                im_info = torch.from_numpy(im_info).float().cuda()
             else:
-                im = torch.from_numpy(im)
+                im_data = torch.from_numpy(im_data)
 
-            scores, bbox_pred, rois, _ = net.forward(im, None, im_info)
+            #im = im.to(device)
+            #im_info = im_info.to(device)
 
-            boxes = rois[:, 1:5] / im_info[2]
+            scores, bbox_pred, rois, _ = net.forward(im_data, None, im_info)
+
+            boxes = (rois[:, 1:])/ im_info[2].cpu().numpy()
+            #2 dims
             scores = np.reshape(scores, [scores.shape[0], -1])
             bbox_pred = np.reshape(bbox_pred, [bbox_pred.shape[0], -1])
             if config['test_bbox_reg']:
@@ -96,6 +104,7 @@ def demo_detection(net, im_dir, images, use_cuda, thresh=.75):
                 box_deltas = bbox_pred
                 pred_boxes = bbox_transform_inv(
                     torch.from_numpy(boxes),
+                    #boxes,
                     torch.from_numpy(box_deltas)).numpy()
                 pred_boxes = clip_boxes(pred_boxes, orig_shape)
             else:
@@ -107,13 +116,24 @@ def demo_detection(net, im_dir, images, use_cuda, thresh=.75):
             # skip j = 0, because it's the background class
             j = 1
             inds = np.where(scores[:, j] > thresh)[0]
-            cls_scores = scores[inds, j]
-            cls_boxes = boxes[inds, j * 4:(j + 1) * 4]
-            cls_dets = np.hstack(
-                (cls_boxes, cls_scores[:, np.newaxis])).astype(
-                np.float32, copy=False)
-            keep = nms(torch.from_numpy(cls_dets),
-                       config['test_nms']).numpy() if cls_dets.size > 0 else []
+            #inds = torch.nonzero(scores[:, j] > thresh).view(-1)
+
+
+            cls_scores = torch.from_numpy(scores)[inds, j]
+            cls_boxes = torch.from_numpy(boxes)[inds, j * 4:(j + 1) * 4]
+
+            _, order = torch.sort(cls_scores, 0, True)
+
+            cls_dets = torch.cat((cls_boxes, cls_scores.unsqueeze(1)), 1)
+            cls_dets = cls_dets[order]
+
+            #cls_dets = np.hstack(
+            #    (cls_boxes, cls_scores[:, np.newaxis])).astype(
+            #   np.float32, copy=False)
+            #keep = nms(torch.from_numpy(cls_dets),
+            #           config['test_nms']).numpy() if cls_dets.size > 0 else []
+            keep = nms(cls_boxes[order, :], cls_scores[order], config['test_nms'])#.numpy() if cls_scores.size > 0 else []
+
             cls_dets = cls_dets[keep, :]
 
             if cls_dets is None:
@@ -135,8 +155,10 @@ def demo_detection(net, im_dir, images, use_cuda, thresh=.75):
                         bbox=dict(facecolor='#66D9EF', linewidth=0),
                         fontsize=20, color='white')
             plt.tight_layout()
-            plt.show()
+            plt.savefig(os.path.join(im_dir, '../results/result_' + im_name))
             plt.close(fig)
+            print('1 image has detected.')
+
 
 
 def demo_search(net, im_dir, images, use_cuda, thresh=.75):
@@ -218,9 +240,13 @@ def demo_search(net, im_dir, images, use_cuda, thresh=.75):
         j = 1
         inds = np.where(scores[:, j] > thresh)[0]
         cls_scores = scores[inds, j]
+        # descending
+        _, order = torch.sort(torch.from_numpy(cls_scores), 0, True)
         cls_boxes = boxes[inds, j * 4:(j + 1) * 4]
         cls_dets = np.hstack((cls_boxes, cls_scores[:, np.newaxis])).astype(
             np.float32, copy=False)
+
+        cls_dets = cls_dets[order]
         keep = nms(torch.from_numpy(cls_dets),
                    config['test_nms']).numpy() if cls_dets.size > 0 else []
         cls_dets = cls_dets[keep, :]
@@ -253,7 +279,7 @@ def demo_search(net, im_dir, images, use_cuda, thresh=.75):
                     bbox=dict(facecolor=colors[sim], linewidth=0), fontsize=20,
                     color='white')
         plt.tight_layout()
-        fig.savefig(os.path.join(im_dir, 'result_' + im_name))
+        fig.savefig(os.path.join(im_dir, '../results/' + im_name))
         plt.show()
         plt.close(fig)
 
@@ -266,21 +292,23 @@ def main():
 
     trained_model_dir = os.path.join(
         opt.model_dir, opt.dataset_name, 'sipn_' + opt.net + '_' +
-                                         opt.trained_epochs + '.pth')
+                                         opt.trained_epochs + '.tar')
 
-    net = SIPN(opt.net, opt.dataset_name, trained_model_dir, is_train=False)
+    net = SIPN(opt.net, opt.dataset_name)#, trained_model_dir, is_train=False)
     net.eval()
     if use_cuda:
         net.cuda()
 
     # load trained model
     print('Loading model check point from {:s}'.format(trained_model_dir))
-    net.load_trained_model(torch.load(trained_model_dir))
+    checkpoint = torch.load(trained_model_dir)
+    net.load_trained_model(checkpoint['model_state_dict'])
+    print('A trained model has loaded.')
 
     test_images = os.listdir(opt.data_dir)
 
-    # demo_detection(net, opt.data_dir, test_images, use_cuda)
-    demo_search(net, opt.data_dir, test_images, use_cuda)
+    demo_detection(net, opt.data_dir, test_images, use_cuda)
+    #demo_search(net, opt.data_dir, test_images, use_cuda)
 
 
 if __name__ == '__main__':

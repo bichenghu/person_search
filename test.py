@@ -17,7 +17,7 @@ from torch.utils.data import DataLoader
 
 from dataset.sipn_dataset import SIPNQueryDataset, SIPNDataset
 import dataset.sipn_transforms as sipn_transforms
-from models.model import SIPN
+from models.sipn.model import SIPN
 from utils.bbox_transform import bbox_transform_inv
 from nms.pth_nms import pth_nms as nms
 from utils.utils import clock_non_return, clip_boxes, AverageMeter

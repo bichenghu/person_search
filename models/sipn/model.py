@@ -19,7 +19,7 @@ from utils.losses import smooth_l1_loss, TripletLoss
 
 class SIPN(nn.Module):
 
-    def __init__(self, net_name, dataset_name, pre_model=''):
+    def __init__(self, net_name, dataset_name, pre_model='', is_train=False):
         super().__init__()
         self.net_name = net_name
 
@@ -118,6 +118,7 @@ class SIPN(nn.Module):
 
             return det_loss, reid_feat, pid_label
 
+        #test
         else:
             if mode == 'gallery':
                 net_conv = self.head(im_data)
@@ -147,10 +148,10 @@ class SIPN(nn.Module):
                     bbox_pred)
                 bbox_pred = bbox_pred.mul(stds).add(means)
 
-                cls_prob = cls_prob.cpu().numpy()
-                bbox_pred = bbox_pred.cpu().numpy()
-                rois = rois.cpu().numpy()
-                reid_feat = reid_feat.cpu().numpy()
+                cls_prob = cls_prob.cpu().detach().numpy()
+                bbox_pred = bbox_pred.cpu().detach().numpy()
+                rois = rois.cpu().detach().numpy()
+                reid_feat = reid_feat.cpu().detach().numpy()
 
                 return cls_prob, bbox_pred, rois, reid_feat
 
@@ -193,5 +194,10 @@ class SIPN(nn.Module):
         normal_init(self.reid_feat_net, 0, 0.01, trun)
 
     def load_trained_model(self, state_dict):
+        #nn.Module.load_state_dict(
+        #   self, {k: state_dict[k] for k in list(self.state_dict())})
+
         nn.Module.load_state_dict(
-            self, {k: state_dict[k] for k in list(self.state_dict())})
+            self, {k: v
+                for k, v in state_dict.items() if k in self.state_dict()}
+        )
