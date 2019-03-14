@@ -6,7 +6,7 @@
 # -----------------------------------------------------
 # -----------------------------------------------------
 # Latest Modified By: Bicheng Hu
-# Latest Modified Date: Mar 6, 2019
+# Latest Modified Date: Mar 14, 2019
 # -----------------------------------------------------
 import os
 import argparse
@@ -18,10 +18,9 @@ import matplotlib.pyplot as plt
 
 from utils.utils import clock_non_return
 from dataset.sipn_dataset import pre_process_image
-from models.sipn.model import SIPN
+from model import SIPN
 from utils.bbox_transform import bbox_transform_inv
-#from nms.pth_nms import pth_nms as nms
-from models.roi_layer.nms import nms
+from model.nms import nms
 
 def parse_args():
     """Parse input arguments"""

@@ -21,7 +21,7 @@ from utils.logger import TensorBoardLogger
 from dataset.sipn_dataset import SIPNDataset, sipn_fn, \
     PersonSearchTripletSampler, PersonSearchTripletFn
 import dataset.sipn_transforms as sipn_transforms
-from models.sipn.model import SIPN
+from model.backbone import SIPN
 from utils.losses import TripletLoss, oim_loss
 
 
@@ -46,7 +46,7 @@ def parse_args():
     parser.add_argument('--optimizer', default='SGD', type=str,
                         help='The optimizer using for the model')
     parser.add_argument('--out_dir', default='./output', type=str,
-                        help='The path to the saved models')
+                        help='The path to the saved model')
     parser.add_argument('--pre_model', default='', type=str,
                         help='The path to the pre-trained model, or set as '
                              '`official` to use the official one')
@@ -191,7 +191,7 @@ def main():
     torch.manual_seed(1024)
 
     save_dir = os.path.join(opt.out_dir, opt.dataset_name)
-    print('Trained models will be saved to {}\n'.format(
+    print('Trained model will be saved to {}\n'.format(
         os.path.abspath(save_dir)))
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
