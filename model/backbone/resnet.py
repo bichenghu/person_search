@@ -7,6 +7,8 @@
 # -----------------------------------------------------
 import torch
 import torch.nn as nn
+
+
 import math
 import torch.utils.model_zoo as model_zoo
 
@@ -163,6 +165,7 @@ def resnet34(pretrained=False):
     Args:
       pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
+
     model = ResNet(BasicBlock, [3, 4, 6, 3])
     if pretrained:
         model.load_state_dict(model_zoo.load_url(model_urls['resnet34']))
@@ -200,6 +203,93 @@ def resnet152(pretrained=False):
     if pretrained:
         model.load_state_dict(model_zoo.load_url(model_urls['resnet152']))
     return model
+
+
+class resnet:
+
+    def __init__(self, num_layers=50, pre_model=None, training=True):
+        self.net_conv_channels = 1024
+        self.fc7_channels = 2048
+        self.training = training
+
+        if num_layers == 50:
+            if self.training:
+                if pre_model:
+                    self.model = resnet50()
+                    state_dict = torch.load(pre_model)
+                    self.model.load_state_dict(
+                        {k: v for k, v in state_dict.items() if k in self.model.state_dict()})
+                else:
+                    raise NotImplementedError('model does not match')
+            else:
+                self.model = resnet50()
+        else:
+            raise KeyError(num_layers)
+
+        with open('config.yml', 'r') as f:
+            config = yaml.load(f)
+        self.fixed_blocks = config['res50_fixed_blocks']
+
+        self.head, self.tail = self.initialize(self.fixed_blocks)
+
+    def initialize(self, fixed_blocks):
+        for p in self.model.bn1.parameters():
+            p.requires_grad = False
+        for p in self.model.conv1.parameters():
+            p.requires_grad = False
+
+        assert 0 <= fixed_blocks < 4
+        if fixed_blocks >= 3:
+            for p in self.model.layer3.parameters():
+                p.requires_grad = False
+        if fixed_blocks >= 2:
+            for p in self.model.layer2.parameters():
+                p.requires_grad = False
+        if fixed_blocks >= 1:
+            for p in self.model.layer1.parameters():
+                p.requires_grad = False
+
+        def set_bn_fix(m):
+            class_name = m.__class__.__name__
+            if class_name.find('BatchNorm') != -1:
+                for p in m.parameters():
+                    p.requires_grad = False
+
+        self.model.apply(set_bn_fix)
+
+        layer3_head = [self.model.layer3[i] for i in range(3)]
+        layer3_head = nn.Sequential(*layer3_head)
+        layer3_tail = [self.model.layer3[i] for i in range(3, 6)]
+        layer3_tail = nn.Sequential(*layer3_tail)
+
+        head = nn.Sequential(self.model.conv1, self.model.bn1,
+                             self.model.relu, self.model.maxpool,
+                             self.model.layer1, self.model.layer2,
+                             layer3_head)
+        tail = nn.Sequential(layer3_tail, self.model.layer4)
+
+        return head, tail
+
+    def train(self, mode):
+        if mode:
+            # Set fixed blocks to be in eval mode (not really doing anything)
+            self.model.eval()
+            if self.fixed_blocks <= 3:
+                self.model.layer4.train()
+            if self.fixed_blocks <= 2:
+                self.model.layer3.train()
+            if self.fixed_blocks <= 1:
+                self.model.layer2.train()
+            if self.fixed_blocks == 0:
+                self.model.layer1.train()
+
+            # Set batchnorm always in eval mode during training
+            def set_bn_eval(m):
+                classname = m.__class__.__name__
+                if classname.find('BatchNorm') != -1:
+                    m.eval()
+
+            self.model.apply(set_bn_eval)
 
 
 class MyResNet:

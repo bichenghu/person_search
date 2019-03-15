@@ -21,7 +21,7 @@ from utils.logger import TensorBoardLogger
 from dataset.sipn_dataset import SIPNDataset, sipn_fn, \
     PersonSearchTripletSampler, PersonSearchTripletFn
 import dataset.sipn_transforms as sipn_transforms
-from model.backbone import SIPN
+from model import SIPN
 from utils.losses import TripletLoss, oim_loss
 
 
