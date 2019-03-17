@@ -133,10 +133,10 @@ class SIPNDataset(Dataset):
         random.shuffle(self.pids)
 
         # TODO: remove the below lines
-        if self.dataset_name == 'sysu':
+        if self.dataset_name == 'CUHK-SYSU':
             self.gallery_sizes = [50, 100, 500, 1000, 2000, 4000]
             self.num_pid = 5532
-        elif self.dataset_name == 'prw':
+        elif self.dataset_name == 'PRW':
             self.gallery_sizes = [200, 500, 1000, 2000, 4000]
             self.num_pid = 483
         else:

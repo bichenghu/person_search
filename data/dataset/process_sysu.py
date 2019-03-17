@@ -19,7 +19,7 @@ def parse_args():
     """Parse input arguments"""
 
     parser = argparse.ArgumentParser(description='Prepare the dataset.')
-    parser.add_argument('--dataset_dir', default='', type=str)
+    parser.add_argument('--dataset_dir', default='CUHK-SYSU', type=str)
     args = parser.parse_args()
 
     return args
