@@ -11,6 +11,7 @@ import torch.nn.functional as func
 import yaml
 
 from model.backbone.vgg16 import Vgg16
+from model.backbone.resnet import resnet
 from model.backbone.resnet import MyResNet
 from model.backbone.densenet import DenseNet
 from model.strpn.strpn import STRPN
@@ -22,11 +23,12 @@ class SIPN(nn.Module):
     def __init__(self, net_name, dataset_name, pre_model='', is_train=False):
         super().__init__()
         self.net_name = net_name
+        self.is_train = is_train
 
-        if dataset_name == 'sysu':
+        if dataset_name == 'CUHK-SYSU':
             self.num_pid = 5532
             self.queue_size = 5000
-        elif dataset_name == 'prw':
+        elif dataset_name == 'PRW':
             self.num_pid = 483
             self.queue_size = 500
         else:
@@ -40,15 +42,16 @@ class SIPN(nn.Module):
             self.queue_size, self.reid_feat_dim).cuda())
 
         if self.net_name == 'vgg16':
-            self.net = Vgg16(pre_model)
+            self.net = Vgg16(pre_model,self.is_train)
         elif self.net_name == 'res34':
-            self.net = MyResNet(34, pre_model)
+            self.net = resnet(34, pre_model, self.is_train)
         elif self.net_name == 'res50':
-            self.net = MyResNet(50, pre_model)
+            #self.net = MyResNet(50, pre_model)
+            self.net = resnet(50, pre_model, self.is_train)
         elif self.net_name == 'dense121':
-            self.net = DenseNet(121, pre_model)
+            self.net = DenseNet(121, pre_model, self.is_train)
         elif self.net_name == 'dense161':
-            self.net = DenseNet(161, pre_model)
+            self.net = DenseNet(161, pre_model, self.is_train)
         else:
             raise KeyError(self.net_name)
 
@@ -56,7 +59,7 @@ class SIPN(nn.Module):
 
         # SPIN consists of three main parts
         self.head = self.net.head
-        self.strpn = STRPN(self.net.net_conv_channels, self.num_pid)
+        self.strpn = STRPN(self.net.net_conv_channels, self.num_pid, self.is_train)
         self.tail = self.net.tail
 
         self.cls_score_net = nn.Linear(self.fc7_channels, 2)

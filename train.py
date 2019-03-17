@@ -1,9 +1,12 @@
 # -----------------------------------------------------
 # Train Spatial Invariant Person Search Network
 #
-# Author: Liangqi Li
-# Creating Date: Mar 31, 2018
-# Latest rectified: Nov 5, 2018
+# Created By: Liangqi Li
+# Created Date: Mar 31, 2018
+# -----------------------------------------------------
+# -----------------------------------------------------
+# Latest Modified By: Bicheng Hu
+# Latest Modified Date: Mar 16, 2019
 # -----------------------------------------------------
 import os
 import time
@@ -18,9 +21,9 @@ from torch.optim import lr_scheduler
 
 from utils.utils import clock_non_return, AverageMeter
 from utils.logger import TensorBoardLogger
-from dataset.sipn_dataset import SIPNDataset, sipn_fn, \
+from data.dataset.sipn_dataset import SIPNDataset, sipn_fn, \
     PersonSearchTripletSampler, PersonSearchTripletFn
-import dataset.sipn_transforms as sipn_transforms
+import data.dataset.sipn_transforms as sipn_transforms
 from model import SIPN
 from utils.losses import TripletLoss, oim_loss
 
@@ -33,10 +36,10 @@ def parse_args():
                         help='Network Backbone')
     parser.add_argument('--max_epoch', default=20, type=int,
                         help='Max epoch to train the model')
-    parser.add_argument('--data_dir', default='', type=str,
+    parser.add_argument('--data_dir', default='data/dataset/PRW-v16.04.20/', type=str,
                         help='The root path to the dataset')
-    parser.add_argument('--dataset_name', default='prw', type=str,
-                        help='The dataset name, `sysu` or `prw`')
+    parser.add_argument('--dataset_name', default='PRW', type=str,
+                        help='The dataset name, `CUHK-SYSU` or `PRW`')
     parser.add_argument('--tensorboard_dir', default='./logs/TensorBoard',
                         help='The path to save TensorBoard files', type=str)
     parser.add_argument('--lr', default=0.0001, type=float,
@@ -47,7 +50,7 @@ def parse_args():
                         help='The optimizer using for the model')
     parser.add_argument('--out_dir', default='./output', type=str,
                         help='The path to the saved model')
-    parser.add_argument('--pre_model', default='', type=str,
+    parser.add_argument('--pre_model', default='data/resnet50.pth', type=str,
                         help='The path to the pre-trained model, or set as '
                              '`official` to use the official one')
     parser.add_argument('--resume', default=0, type=int,
@@ -187,7 +190,7 @@ def main():
     opt = parse_args()
     global device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    torch.backends.cudnn.benchmark = True
+    #torch.backends.cudnn.benchmark = True
     torch.manual_seed(1024)
 
     save_dir = os.path.join(opt.out_dir, opt.dataset_name)
@@ -210,7 +213,7 @@ def main():
     if opt.resume != 0:
         pre_model = ''
 
-    model = SIPN(opt.net, opt.dataset_name, pre_model)
+    model = SIPN(opt.net, opt.dataset_name, pre_model, is_train=True)
     model.to(device)
 
     # Read the configuration file

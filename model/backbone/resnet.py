@@ -15,7 +15,7 @@ import torch.utils.model_zoo as model_zoo
 import yaml
 
 
-__all__ = ['ResNet', 'MyResNet', 'resnet18', 'resnet34', 'resnet50',
+__all__ = ['ResNet', 'MyResNet', 'resnet', 'resnet18', 'resnet34', 'resnet50',
            'resnet101', 'resnet152']
 
 root_url = 'https://s3.amazonaws.com/pytorch/model/'
@@ -207,13 +207,13 @@ def resnet152(pretrained=False):
 
 class resnet:
 
-    def __init__(self, num_layers=50, pre_model=None, training=True):
+    def __init__(self, num_layers=50, pre_model=None, is_train=False):
         self.net_conv_channels = 1024
         self.fc7_channels = 2048
-        self.training = training
+        self.is_train = is_train
 
         if num_layers == 50:
-            if self.training:
+            if self.is_train:
                 if pre_model:
                     self.model = resnet50()
                     state_dict = torch.load(pre_model)
